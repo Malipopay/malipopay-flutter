@@ -114,7 +114,7 @@ class MalipopayHttpClient {
           _isSafeToRetry(method, body) &&
           attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
-        return _request(method, path,
+        return await _request(method, path,
             params: params, body: body, attempt: attempt + 1);
       }
 
@@ -122,7 +122,7 @@ class MalipopayHttpClient {
     } on TimeoutException {
       if (_isSafeToRetry(method, body) && attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
-        return _request(method, path,
+        return await _request(method, path,
             params: params, body: body, attempt: attempt + 1);
       }
       throw ConnectionException('Request timed out after $timeout');
