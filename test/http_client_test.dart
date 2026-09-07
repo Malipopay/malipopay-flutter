@@ -19,6 +19,16 @@ class _Spy {
     });
   }
 
+  /// A handler that can take its time, for exercising the timeout arm.
+  MockClient respondingSlowly(
+    Future<http.Response> Function(http.Request request, int attempt) handler,
+  ) {
+    return MockClient((request) async {
+      requests.add(request);
+      return handler(request, calls++);
+    });
+  }
+
   http.BaseRequest get last => requests.last;
 }
 
@@ -127,7 +137,7 @@ void main() {
       expect(spy.requests, hasLength(2));
     });
 
-    test('a POST with no reference is NOT retried', () async {
+    test('a POST is NOT retried', () async {
       // The whole point: a collection that timed out may already have charged
       // the customer, and nothing in the response can tell us which.
       final spy = _Spy();
@@ -150,32 +160,62 @@ void main() {
       expect(spy.requests, hasLength(1));
     });
 
-    test('a POST carrying a reference IS retried', () async {
-      // A caller-supplied reference is the backend's idempotency key, so a
-      // repeat resolves to the first request instead of creating a second.
+    test('a POST carrying a reference is NOT retried either', () async {
+      // This is the case that looks safe and is not. The caller's reference
+      // is stored as `customerReference`, a label; the payment's own
+      // reference is minted server-side and the backend does not resolve a
+      // repeat to the first request.
+      //
+      // Measured against UAT on 2026-09-07: two POST /api/v2/payment/collection
+      // calls with the identical reference MRCH629732 produced MU00206 and
+      // MU00207, two payments, both for 1,000 TZS.
       final spy = _Spy();
       final client = Malipopay(
         'k',
         environment: MalipopayEnvironment.uat,
-        retries: 1,
-        httpClient: spy.responding(
-          (_, attempt) => attempt == 0
-              ? _json({'message': 'boom'}, 500)
-              : _json({
-                  'data': {'reference': 'ORD-1'}
-                }),
-        ),
+        retries: 3,
+        httpClient: spy.responding((_, __) => _json({'message': 'boom'}, 500)),
       );
 
-      final result = await client.payments.collect({
-        'reference': 'ORD-1',
-        'description': 'Order',
-        'amount': 10000,
-        'phoneNumber': '255712345678',
-      });
+      await expectLater(
+        client.payments.collect({
+          'reference': 'ORD-1',
+          'description': 'Order',
+          'amount': 10000,
+          'phoneNumber': '255712345678',
+        }),
+        throwsA(isA<ApiException>()),
+      );
 
-      expect(spy.requests, hasLength(2));
-      expect((result as Map)['reference'], 'ORD-1');
+      expect(spy.requests, hasLength(1));
+    });
+
+    test('a timed-out POST is not retried either', () async {
+      // The timeout arm is the one that fires in practice: that same
+      // collection took 41 seconds on its first attempt.
+      final spy = _Spy();
+      final client = Malipopay(
+        'k',
+        environment: MalipopayEnvironment.uat,
+        retries: 3,
+        timeout: const Duration(milliseconds: 50),
+        httpClient: spy.respondingSlowly((_, __) async {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          return _json({'data': <String, dynamic>{}});
+        }),
+      );
+
+      await expectLater(
+        client.payments.collect({
+          'reference': 'ORD-1',
+          'description': 'Order',
+          'amount': 10000,
+          'phoneNumber': '255712345678',
+        }),
+        throwsA(isA<ConnectionException>()),
+      );
+
+      expect(spy.requests, hasLength(1));
     });
   });
 

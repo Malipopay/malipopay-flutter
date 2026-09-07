@@ -111,7 +111,7 @@ class MalipopayHttpClient {
       }
 
       if (_isRetryable(response.statusCode) &&
-          _isSafeToRetry(method, body) &&
+          _isSafeToRetry(method) &&
           attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
         return await _request(method, path,
@@ -120,7 +120,7 @@ class MalipopayHttpClient {
 
       throw _errorFromResponse(response);
     } on TimeoutException {
-      if (_isSafeToRetry(method, body) && attempt < retries) {
+      if (_isSafeToRetry(method) && attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
         return await _request(method, path,
             params: params, body: body, attempt: attempt + 1);
@@ -154,20 +154,30 @@ class MalipopayHttpClient {
 
   /// Whether repeating this request can only be harmless.
   ///
-  /// GET, PUT and DELETE are idempotent by definition. POST is not: a retried
-  /// `/payment/collection` or `/payment/disbursement` whose first attempt
-  /// actually reached the backend charges or pays out twice, and a timeout
-  /// cannot tell you which side of the wire it failed on.
+  /// GET, PUT and DELETE are idempotent by definition. POST is not, and there
+  /// is currently no way to make it so.
   ///
-  /// The exception is a POST whose body carries a caller-supplied `reference`.
-  /// That is the backend's idempotency key: a second request under the same
-  /// reference resolves to the first one instead of creating a second.
-  static bool _isSafeToRetry(String method, Object? body) {
-    if (method != 'POST') return true;
-    if (body is! Map) return false;
-    final reference = body['reference'];
-    return reference is String && reference.isNotEmpty;
-  }
+  /// A retried `/payment/collection` or `/payment/disbursement` whose first
+  /// attempt actually reached the backend charges or pays out twice, and a
+  /// timeout cannot tell you which side of the wire it failed on.
+  ///
+  /// An earlier version of this made an exception for a POST carrying a
+  /// caller-supplied `reference`, on the belief that the backend treated it
+  /// as an idempotency key. **It does not.** Measured against UAT on
+  /// 2026-09-07: two `POST /api/v2/payment/collection` calls with the
+  /// identical `reference` of `MRCH629732` produced two separate payments,
+  /// `MU00206` and `MU00207`, with different ids and both charging 1,000 TZS.
+  /// The caller's value is stored as `customerReference`, a label, while the
+  /// payment's own reference is minted server-side.
+  ///
+  /// So no POST is retried. This matters more than it looks: that same
+  /// collection call took 41 seconds on its first attempt, which is longer
+  /// than most default client timeouts, so the retry would have fired
+  /// routinely rather than rarely.
+  ///
+  /// Restore the exception only when the backend accepts a real idempotency
+  /// key and answers a repeat with the original payment.
+  static bool _isSafeToRetry(String method) => method != 'POST';
 
   Duration _backoff(int attempt) {
     final ms = (1000 * (1 << attempt)).clamp(1000, 10000);

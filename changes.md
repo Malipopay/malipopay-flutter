@@ -16,6 +16,23 @@ retried on timeout and 5xx with no idempotency key, so a collection or
 disbursement that timed out after reaching the backend was re-sent, and neither
 the SDK nor the caller could tell whether money had already moved.
 
+**Correction, 2026-09-07, before merge.** The first version of the retry fix
+kept an exception: a POST carrying a caller-supplied `reference` was still
+retried, on the belief that the backend treated that reference as an
+idempotency key. **It does not.** Measured against UAT: two
+`POST /api/v2/payment/collection` calls with the identical `reference` of
+`MRCH629732` produced two separate payments, `MU00206` and `MU00207`, both for
+1,000 TZS. The caller's value is stored as `customerReference`, a label, while
+the payment's own reference is minted server-side, and
+`GET /payment/verify/{reference}` does not resolve by the caller's one.
+
+So no POST is retried at all. This is not a rare edge: the same call took **41
+seconds** on its first attempt, longer than most default client timeouts, and
+a timed-out attempt in that session (`MRCH709895`) DID create a payment,
+`MU00205`, which the client never learned about. Restore the exception only
+when the backend accepts a real idempotency key and answers a repeat with the
+original payment.
+
 **What changed.** `Malipopay.session(SessionAuth(...))` alongside the existing
 `Malipopay(apiKey)`, emitting exactly one credential set, never both, with the
 `project` header carrying the slug on the messaging paths and the project id
