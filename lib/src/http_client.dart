@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'auth.dart';
 import 'exceptions.dart';
 
 /// Internal HTTP client wrapping the Malipopay API.
@@ -10,17 +11,24 @@ class MalipopayHttpClient {
   /// Creates a new [MalipopayHttpClient].
   MalipopayHttpClient({
     required this.baseUrl,
-    required this.apiKey,
+    required this.auth,
     this.timeout = const Duration(seconds: 30),
     this.retries = 2,
+    this.onUnauthorized,
     http.Client? httpClient,
   }) : _client = httpClient ?? http.Client();
 
   /// The base URL for the API.
   final String baseUrl;
 
-  /// The API key used for authentication.
-  final String apiKey;
+  /// How this client proves who it is. See [MalipopayAuth].
+  final MalipopayAuth auth;
+
+  /// Called when the API rejects the credentials (HTTP 401).
+  ///
+  /// A session-authenticated app uses this to refresh or to sign the user out.
+  /// It fires before the exception is thrown, and does not retry the request.
+  final Future<void> Function()? onUnauthorized;
 
   /// Request timeout.
   final Duration timeout;
@@ -62,7 +70,7 @@ class MalipopayHttpClient {
   }) async {
     final uri = _buildUri(path, params);
     final headers = <String, String>{
-      'apiToken': apiKey,
+      ...await auth.headers(path),
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json',
     };
@@ -98,7 +106,13 @@ class MalipopayHttpClient {
         return decoded;
       }
 
-      if (_isRetryable(response.statusCode) && attempt < retries) {
+      if (response.statusCode == 401) {
+        await onUnauthorized?.call();
+      }
+
+      if (_isRetryable(response.statusCode) &&
+          _isSafeToRetry(method, body) &&
+          attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
         return _request(method, path,
             params: params, body: body, attempt: attempt + 1);
@@ -106,7 +120,7 @@ class MalipopayHttpClient {
 
       throw _errorFromResponse(response);
     } on TimeoutException {
-      if (attempt < retries) {
+      if (_isSafeToRetry(method, body) && attempt < retries) {
         await Future<void>.delayed(_backoff(attempt));
         return _request(method, path,
             params: params, body: body, attempt: attempt + 1);
@@ -114,6 +128,11 @@ class MalipopayHttpClient {
       throw ConnectionException('Request timed out after $timeout');
     } on MalipopayException {
       rethrow;
+    } on FormatException catch (e) {
+      // The connection was fine; the server sent something unparseable.
+      // Reporting this as a connection error sends the caller to retry logic
+      // that cannot help.
+      throw ApiException('Malformed response from the API: ${e.message}', 0);
     } catch (e) {
       throw ConnectionException(e.toString());
     }
@@ -133,6 +152,23 @@ class MalipopayHttpClient {
 
   bool _isRetryable(int statusCode) => statusCode == 429 || statusCode >= 500;
 
+  /// Whether repeating this request can only be harmless.
+  ///
+  /// GET, PUT and DELETE are idempotent by definition. POST is not: a retried
+  /// `/payment/collection` or `/payment/disbursement` whose first attempt
+  /// actually reached the backend charges or pays out twice, and a timeout
+  /// cannot tell you which side of the wire it failed on.
+  ///
+  /// The exception is a POST whose body carries a caller-supplied `reference`.
+  /// That is the backend's idempotency key: a second request under the same
+  /// reference resolves to the first one instead of creating a second.
+  static bool _isSafeToRetry(String method, Object? body) {
+    if (method != 'POST') return true;
+    if (body is! Map) return false;
+    final reference = body['reference'];
+    return reference is String && reference.isNotEmpty;
+  }
+
   Duration _backoff(int attempt) {
     final ms = (1000 * (1 << attempt)).clamp(1000, 10000);
     return Duration(milliseconds: ms);
@@ -145,8 +181,15 @@ class MalipopayHttpClient {
       if (decoded is Map<String, dynamic>) body = decoded;
     } catch (_) {}
 
-    final message = (body['message'] as String?) ?? response.reasonPhrase ?? 'Unknown error';
-    final code = body['code'] as int?;
+    // Malipopay puts a code label in `message` and the human-readable reason
+    // in `details`. Preferring `message` is what makes every failure read as
+    // a generic "controller:x:y->error" string.
+    final details = _detailsOf(body);
+    final message = details ??
+        (body['message'] as String?) ??
+        response.reasonPhrase ??
+        'Unknown error';
+    final code = body['code'] is int ? body['code'] as int : null;
 
     switch (response.statusCode) {
       case 401:
@@ -155,13 +198,40 @@ class MalipopayHttpClient {
         return PermissionException(message);
       case 404:
         return NotFoundException(message);
+      // 400 as well as 422: central-api returns 400 for most validation
+      // failures, and callers need the field map from both.
+      case 400:
       case 422:
-        return ValidationException(message);
+        return ValidationException(message, fields: _fieldsOf(body));
       case 429:
         final retryAfter = int.tryParse(response.headers['retry-after'] ?? '');
         return RateLimitException(message, retryAfter);
       default:
         return ApiException(message, response.statusCode, code: code);
     }
+  }
+
+  /// The human-readable reason, from whichever shape the API used.
+  static String? _detailsOf(Map<String, dynamic> body) {
+    final d = body['details'] ?? body['detail'] ?? body['error'];
+    if (d is String && d.isNotEmpty) return d;
+    if (d is List && d.isNotEmpty) {
+      return d.map((e) => e.toString()).join(', ');
+    }
+    return null;
+  }
+
+  /// Field-level validation errors, when the API sent any.
+  ///
+  /// Accepts both `{"field": "reason"}` and `{"field": ["reason", ...]}`.
+  static Map<String, String>? _fieldsOf(Map<String, dynamic> body) {
+    final raw = body['errors'] ?? body['fields'] ?? body['validation'];
+    if (raw is! Map) return null;
+    final out = <String, String>{};
+    raw.forEach((k, v) {
+      out[k.toString()] =
+          v is List ? v.map((e) => e.toString()).join(', ') : v.toString();
+    });
+    return out.isEmpty ? null : out;
   }
 }

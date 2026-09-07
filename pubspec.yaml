@@ -1,6 +1,6 @@
 name: malipopay
 description: Official Dart/Flutter SDK for the Malipopay payment platform. Accept payments via Mobile Money (M-Pesa, Airtel, Mixx/YAS, Halopesa, T-Pesa), Bank Transfer, USSD, and Card in Tanzania.
-version: 1.0.0
+version: 1.1.0
 homepage: https://developers.malipopay.co.tz
 repository: https://github.com/Malipopay/malipopay-flutter
 issue_tracker: https://github.com/Malipopay/malipopay-flutter/issues
