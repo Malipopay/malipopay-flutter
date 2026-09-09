@@ -22,10 +22,13 @@
 /// ```
 library malipopay;
 
+export 'src/auth.dart';
 export 'src/client.dart';
 export 'src/exceptions.dart';
-export 'src/webhooks.dart'
-    show Webhooks, WebhookEvent, WebhookEventType;
+// Exported so the resource classes, which are public and take one, can
+// actually be constructed outside this package.
+export 'src/http_client.dart' show MalipopayHttpClient;
+export 'src/webhooks.dart' show Webhooks, WebhookEvent, WebhookEventType;
 export 'src/resources/account.dart';
 export 'src/resources/customers.dart';
 export 'src/resources/invoices.dart';

@@ -1,89 +1,11 @@
-# Malipopay SDK Development Rules
+# malipopay-flutter: Claude Context
 
-## Naming Convention — CRITICAL
+**Flutter/Dart SDK.** Package `malipopay` on pub.dev (pubspec.yaml).
 
-The brand name is **Malipopay** (single capital M, all lowercase after). Never use "MaliPoPay" with capital P-o-P.
+## Rules (inherited, do not restate here)
 
-| Context | Correct | Wrong |
-|---------|---------|-------|
-| PascalCase class | `Malipopay` | `MaliPoPay` |
-| Error class | `MalipopayError` | `MaliPoPayError` |
-| Exception class | `MalipopayException` | `MaliPoPayException` |
-| Config type | `MalipopayConfig` | `MaliPoPayConfig` |
-| Options type | `MalipopayOptions` | `MaliPoPayOptions` |
-| Client class | `MalipopayClient` | `MaliPoPayClient` |
-| Module/package | `malipopay` | ✅ already correct |
-| In docs/prose | "Malipopay" or "malipopay" | "MaliPoPay" |
-| URLs/paths | `malipopay` | ✅ already correct |
+The parent `Malipopay/CLAUDE.md` auto-loads for this repo (parent-directory traversal) and carries everything that used to live in this file: the Malipopay naming convention (never "MaliPoPay"), per-language naming examples, SDK architecture (resource-oriented clients, `apiToken` header, error hierarchy), package registries, git flow, and company details.
 
-### Per-Language Examples
-
-```typescript
-// Node.js / TypeScript
-import { Malipopay, MalipopayError } from "malipopay";
-const client = new Malipopay("api-key");
-```
-
-```python
-# Python
-from malipopay import Malipopay, AsyncMalipopay, MalipopayError
-client = Malipopay("api-key")
-```
-
-```php
-// PHP
-use Malipopay\Malipopay;
-use Malipopay\Exceptions\MalipopayException;
-$client = new Malipopay("api-key");
-```
-
-```java
-// Java
-import tz.co.malipopay.Malipopay;
-import tz.co.malipopay.MalipopayConfig;
-Malipopay client = new Malipopay("api-key");
-```
-
-```csharp
-// C# / .NET
-using Malipopay;
-var client = new MalipopayClient("api-key");
-```
-
-```ruby
-# Ruby
-require "malipopay"
-client = Malipopay::Client.new(api_key: "api-key")
-```
-
-## SDK Architecture
-
-- **Resource-oriented:** `client.payments.collect()`, `client.customers.create()`
-- **Auth:** `apiToken` header (API key from dashboard)
-- **Base URLs:**
-  - Production: `https://core-prod.malipopay.co.tz`
-  - UAT: `https://core-uat.malipopay.co.tz`
-- **Error hierarchy:** `MalipopayError` → `AuthenticationError`, `ValidationError`, `NotFoundError`, `PermissionError`, `RateLimitError`, `ApiError`, `ConnectionError`
-
-## GitHub Organization
-
-https://github.com/Malipopay
-
-## Package Registries
-
-| Language | Package | Registry |
-|----------|---------|----------|
-| Node.js | `malipopay` | npm |
-| Python | `malipopay` | PyPI |
-| PHP | `malipopay/malipopay-php` | Packagist |
-| Java | `tz.co.malipopay:malipopay-java` | Maven Central |
-| .NET | `Malipopay` | NuGet |
-| Ruby | `malipopay` | RubyGems |
-
-## Company
-
-- **Company:** Lockwood Technology Ltd
-- **Product:** Malipopay
-- **Website:** malipopay.co.tz
-- **Developer Docs:** developers.malipopay.co.tz
-- **Support:** support@malipopay.co.tz
+- Base URLs: production `https://core-prod.malipopay.co.tz`, UAT `https://core-uat.malipopay.co.tz`
+- API spec source of truth: `malipopay-openapi/openapi.yaml`; check it before adding or changing an endpoint binding
+- Cross-SDK behaviour tests live in `malipopay-sdk-tests/scenarios/`; run the relevant scenario before declaring an SDK change done

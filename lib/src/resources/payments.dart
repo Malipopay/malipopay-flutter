@@ -33,7 +33,8 @@ class Payments {
 
   /// Verify the status of a payment by reference.
   Future<dynamic> verify(String reference) {
-    return _http.get('/api/v1/payment/verify/${Uri.encodeComponent(reference)}');
+    return _http
+        .get('/api/v1/payment/verify/${Uri.encodeComponent(reference)}');
   }
 
   /// Get a payment by reference.

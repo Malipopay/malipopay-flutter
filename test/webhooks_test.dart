@@ -18,7 +18,8 @@ void main() {
 
     group('verify', () {
       test('returns true for valid signature', () {
-        const payload = '{"type":"payment.completed","data":{"reference":"PAY-123"}}';
+        const payload =
+            '{"type":"payment.completed","data":{"reference":"PAY-123"}}';
         final signature = sign(payload, secret);
         expect(webhooks.verify(payload, signature), isTrue);
       });

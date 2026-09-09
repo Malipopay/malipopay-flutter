@@ -19,8 +19,7 @@ class Account {
 
   /// Get a single account transaction by ID.
   Future<dynamic> getTransaction(String id) {
-    return _http
-        .get('/api/v1/account/transaction/${Uri.encodeComponent(id)}');
+    return _http.get('/api/v1/account/transaction/${Uri.encodeComponent(id)}');
   }
 
   /// List reconciliation webhooks.
