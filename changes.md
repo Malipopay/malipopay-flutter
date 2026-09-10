@@ -2,6 +2,28 @@
 
 What shipped in `malipopay-flutter` and why. Newest first, one entry per merged PR.
 
+## 2026-09-10 · #2 · Keep the internal working records out of the published archive
+
+**Why.** `dart pub publish --dry-run` listed `CLAUDE.md`, `changes.md`,
+`plans.md` and `docs/plans/2026-09-07-dual-auth.md` in the archive. Those are
+internal Lockwood records, not documentation for the package's users, and a
+pub.dev version cannot be unpublished, so the moment to catch it is before the
+first publish that would carry them.
+
+**What changed.** A `.pubignore` excluding those four, which also settles pub's
+"rename docs/ to doc/" warning: the only thing under `docs/` is a planning
+note, so it is excluded rather than renamed. The archive goes from 23 KB to
+18 KB and the dry-run from one warning to zero.
+
+**The trap this file is written around.** `.pubignore` REPLACES `.gitignore`
+for publishing rather than adding to it, so anything `.gitignore` covered and
+`.pubignore` does not would silently start being published. Every non-comment
+line of `.gitignore` is therefore restated here, `.env` and `coverage/`
+included, and there is a check for it: no `.gitignore` entry is missing from
+`.pubignore`.
+
+---
+
 ## 2026-09-07 · #1 · Dashboard/mobile auth, safe retries, and the first HTTP tests
 
 **Why.** The Malipopay merchant mobile app needs this SDK for payments,

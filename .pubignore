@@ -1,0 +1,25 @@
+# Files that belong in the repo but not on the package's public pub.dev page.
+# .pubignore replaces .gitignore for publishing, so it must ALSO restate the
+# build artefacts .gitignore covers, or they would start being published.
+.dart_tool/
+.packages
+.pub/
+pubspec.lock
+build/
+doc/api/
+coverage/
+*.iml
+.idea/
+.vscode/
+.env
+
+# Internal working records. changes.md and plans.md are the Malipopay
+# repo convention, CLAUDE.md is agent context, and docs/plans holds planning
+# notes. None of them documents the package for its users, and publishing is
+# irreversible, so they stay out of the archive rather than being tidied up
+# after the fact. This also settles pub's "rename docs/ to doc/" warning: the
+# only thing under docs/ is a planning note, so it is excluded, not renamed.
+CLAUDE.md
+changes.md
+plans.md
+docs/
