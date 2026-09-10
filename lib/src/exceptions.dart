@@ -27,22 +27,22 @@ class MalipopayException implements Exception {
 /// Thrown when the API key is invalid or missing (HTTP 401).
 class AuthenticationException extends MalipopayException {
   /// Creates an [AuthenticationException].
-  AuthenticationException([String message = 'Invalid API key'])
-      : super(message, statusCode: 401);
+  AuthenticationException([super.message = 'Invalid API key'])
+      : super(statusCode: 401);
 }
 
 /// Thrown when the API key lacks permission (HTTP 403).
 class PermissionException extends MalipopayException {
   /// Creates a [PermissionException].
-  PermissionException([String message = 'Insufficient permissions'])
-      : super(message, statusCode: 403);
+  PermissionException([super.message = 'Insufficient permissions'])
+      : super(statusCode: 403);
 }
 
 /// Thrown when a resource is not found (HTTP 404).
 class NotFoundException extends MalipopayException {
   /// Creates a [NotFoundException].
-  NotFoundException([String message = 'Resource not found'])
-      : super(message, statusCode: 404);
+  NotFoundException([super.message = 'Resource not found'])
+      : super(statusCode: 404);
 }
 
 /// Thrown when request validation fails (HTTP 422).
@@ -57,8 +57,8 @@ class ValidationException extends MalipopayException {
 /// Thrown when rate limit is exceeded (HTTP 429).
 class RateLimitException extends MalipopayException {
   /// Creates a [RateLimitException].
-  RateLimitException([String message = 'Rate limit exceeded', this.retryAfter])
-      : super(message, statusCode: 429);
+  RateLimitException([super.message = 'Rate limit exceeded', this.retryAfter])
+      : super(statusCode: 429);
 
   /// Seconds to wait before retrying.
   final int? retryAfter;
@@ -67,12 +67,12 @@ class RateLimitException extends MalipopayException {
 /// Thrown for 5xx server errors.
 class ApiException extends MalipopayException {
   /// Creates an [ApiException].
-  ApiException(String message, int statusCode, {int? code})
-      : super(message, statusCode: statusCode, code: code);
+  ApiException(super.message, int statusCode, {super.code})
+      : super(statusCode: statusCode);
 }
 
 /// Thrown for network/connection errors.
 class ConnectionException extends MalipopayException {
   /// Creates a [ConnectionException].
-  ConnectionException([String message = 'Connection failed']) : super(message);
+  ConnectionException([super.message = 'Connection failed']);
 }

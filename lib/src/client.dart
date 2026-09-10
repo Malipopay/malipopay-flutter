@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import 'auth.dart';
 import 'http_client.dart';
 import 'resources/account.dart';
 import 'resources/customers.dart';
@@ -16,8 +17,11 @@ enum MalipopayEnvironment {
   /// Production environment (real money).
   production('https://core-prod.malipopay.co.tz'),
 
-  /// UAT environment (for testing).
-  uat('https://core-uat.malipopay.co.tz');
+  /// UAT environment. Tracks the `develop` branch of each service.
+  uat('https://core-uat.malipopay.co.tz'),
+
+  /// Staging environment. Tracks the `staging` branch.
+  staging('https://core-staging.malipopay.co.tz');
 
   const MalipopayEnvironment(this.baseUrl);
 
@@ -38,9 +42,13 @@ enum MalipopayEnvironment {
 /// });
 /// ```
 class Malipopay {
-  /// Creates a new Malipopay client.
+  /// Creates a client authenticated with a project API token.
   ///
   /// [apiKey] is required. Get yours at https://app.malipopay.co.tz.
+  ///
+  /// This is the server-side persona. **Do not use it in a mobile or web app**:
+  /// an API token is a project-wide secret, extractable from any shipped
+  /// binary, and it is not scoped to a user. Use [Malipopay.session] there.
   Malipopay(
     String apiKey, {
     MalipopayEnvironment environment = MalipopayEnvironment.production,
@@ -54,12 +62,72 @@ class Malipopay {
       throw ArgumentError(
           'Malipopay API key is required. Get yours at https://app.malipopay.co.tz');
     }
-
-    _http = MalipopayHttpClient(
+    _init(
+      auth: ApiTokenAuth(apiKey),
       baseUrl: baseUrl ?? environment.baseUrl,
-      apiKey: apiKey,
       timeout: timeout,
       retries: retries,
+      webhookSecret: webhookSecret,
+      httpClient: httpClient,
+    );
+  }
+
+  /// Creates a client authenticated as a signed-in user acting on a project.
+  ///
+  /// This is the dashboard and mobile persona: `Authorization: Bearer <jwt>`
+  /// plus a `project` header. Both are read through callbacks on every
+  /// request, so refreshing a token or switching business needs no new client.
+  ///
+  /// ```dart
+  /// final client = Malipopay.session(
+  ///   SessionAuth(
+  ///     token: () => secureStorage.read(key: 'access_token'),
+  ///     projectId: () => scope.current?.id,
+  ///     projectSlug: () => scope.current?.slug,
+  ///   ),
+  ///   environment: MalipopayEnvironment.uat,
+  ///   onUnauthorized: authCubit.checkAuthStatus,
+  /// );
+  /// ```
+  ///
+  /// [onUnauthorized] fires on any 401 before the exception is thrown, which
+  /// is where an app refreshes the session or signs the user out.
+  Malipopay.session(
+    SessionAuth auth, {
+    MalipopayEnvironment environment = MalipopayEnvironment.production,
+    String? baseUrl,
+    Duration timeout = const Duration(seconds: 30),
+    int retries = 2,
+    String? webhookSecret,
+    Future<void> Function()? onUnauthorized,
+    http.Client? httpClient,
+  }) {
+    _init(
+      auth: auth,
+      baseUrl: baseUrl ?? environment.baseUrl,
+      timeout: timeout,
+      retries: retries,
+      webhookSecret: webhookSecret,
+      onUnauthorized: onUnauthorized,
+      httpClient: httpClient,
+    );
+  }
+
+  void _init({
+    required MalipopayAuth auth,
+    required String baseUrl,
+    required Duration timeout,
+    required int retries,
+    String? webhookSecret,
+    Future<void> Function()? onUnauthorized,
+    http.Client? httpClient,
+  }) {
+    _http = MalipopayHttpClient(
+      baseUrl: baseUrl,
+      auth: auth,
+      timeout: timeout,
+      retries: retries,
+      onUnauthorized: onUnauthorized,
       httpClient: httpClient,
     );
 

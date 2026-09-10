@@ -24,8 +24,8 @@ class Customers {
 
   /// Get a customer by customer number.
   Future<dynamic> getByNumber(String customerNo) {
-    return _http.get(
-        '/api/v1/customer/number/${Uri.encodeComponent(customerNo)}');
+    return _http
+        .get('/api/v1/customer/number/${Uri.encodeComponent(customerNo)}');
   }
 
   /// Get a customer by phone number.
@@ -41,7 +41,7 @@ class Customers {
 
   /// Verify a customer by phone number.
   Future<dynamic> verify(String phoneNumber) {
-    return _http.post('/api/v1/customer/verify',
-        body: {'phoneNumber': phoneNumber});
+    return _http
+        .post('/api/v1/customer/verify', body: {'phoneNumber': phoneNumber});
   }
 }
